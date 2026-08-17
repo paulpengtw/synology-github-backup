@@ -80,7 +80,56 @@ In DSM: **Control Panel → Task Scheduler → Create → Scheduled Task → Use
   Optionally enable *"Send run details by email → only when the script
   terminates abnormally"* so you notice if a token expires.
 
-Output lands in `~/Backup/GitHub/backup.log`.
+## Reading the log & verifying runs
+
+Every run appends to `~/Backup/GitHub/backup.log` (auto-truncated to the last
+~5000 lines by `daily-task.sh`). A run looks like:
+
+```
+=== GitHub backup for <username> — Mon Aug 17 15:17:12 CST 2026 ===
+Updating paulpengtw/some-repo        # existing repo: fetched + pulled
+Cloning  paulpengtw/new-repo         # repo created since the last run
+=== Done — Mon Aug 17 15:24:03 CST 2026 ===
+```
+
+Useful checks:
+
+```sh
+# When did the last run finish?
+grep '=== Done' ~/Backup/GitHub/backup.log | tail -1
+
+# Watch a run live
+tail -f ~/Backup/GitHub/backup.log
+
+# How many repos did the latest run touch?
+awk '/=== GitHub backup/{buf=""} {buf=buf $0 "\n"} END{printf "%s", buf}' \
+  ~/Backup/GitHub/backup.log | grep -c '^Updating\|^Cloning'
+
+# Any real errors? (excludes DSM's harmless LD_PRELOAD warning, see below)
+grep -iE 'error|fatal|failed' ~/Backup/GitHub/backup.log | grep -v openhook.so
+```
+
+A healthy run has a matching `=== Done` line for every `=== GitHub backup`
+header and nothing from the error grep. A header without a `Done` means the run
+was interrupted; the next run picks up where it left off, since every repo is
+independently cloned-or-updated.
+
+## Troubleshooting
+
+- **`ERROR: ld.so: object 'openhook.so' from LD_PRELOAD cannot be preloaded
+  ... ignored.`** — DSM Task Scheduler injects `LD_PRELOAD=openhook.so` into
+  tasks, which Homebrew binaries can't load. It is harmless and the run still
+  succeeds; `daily-task.sh` unsets `LD_PRELOAD` so current versions don't log
+  it at all.
+- **Runs suddenly fail with authentication errors** — your GitHub token
+  expired or was revoked. SSH in and run `gh auth login` again. This is why
+  enabling the Task Scheduler abnormal-termination email matters.
+- **A repo keeps reporting nothing / stale default branch** — its default
+  branch is named something other than `main`/`master`. All branches are still
+  fetched as remote-tracking refs (nothing is lost); only the checked-out
+  working copy stays behind. `cd` into it and `git checkout <branch>` once.
+- **Testing outside the scheduler** — run `./daily-task.sh` manually over SSH;
+  it behaves identically and writes to the same log.
 
 ## Configuration
 
