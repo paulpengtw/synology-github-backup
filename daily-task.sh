@@ -2,6 +2,11 @@
 # daily-task.sh — wrapper for Synology DSM Task Scheduler.
 # Sets up the Homebrew environment (DSM tasks run with a bare PATH),
 # then runs the backup and appends output to a log next to the backups.
+
+# DSM Task Scheduler injects LD_PRELOAD=openhook.so, which Homebrew
+# binaries can't load — every process would log a (harmless) warning.
+unset LD_PRELOAD
+
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
 BACKUP_DIR="${BACKUP_DIR:-$HOME/Backup/GitHub}"
