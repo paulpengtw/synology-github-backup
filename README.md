@@ -42,13 +42,20 @@ browse files in File Station.
 ## Prerequisites
 
 - A Synology NAS with SSH enabled (DSM 7 tested).
-- `git` and the GitHub CLI (`gh`). The easiest route is
-  [Homebrew on Synology](https://github.com/zebernst/synology-homebrew) (or any
-  Synology Homebrew installer), then:
+- `git` — DSM 7 ships one at `/bin/git`.
+- The GitHub CLI (`gh`). **Recommended:** the official static binary in
+  `~/bin`, which needs no root and survives DSM updates (`daily-task.sh`
+  puts `~/bin` first on PATH):
 
   ```sh
-  brew install gh
+  V=2.103.3   # latest from https://github.com/cli/cli/releases
+  curl -fsSLO https://github.com/cli/cli/releases/download/v$V/gh_${V}_linux_amd64.tar.gz
+  tar xzf gh_${V}_linux_amd64.tar.gz
+  mkdir -p ~/bin && cp gh_${V}_linux_amd64/bin/gh ~/bin/
   ```
+
+  Homebrew's `gh` also works, but Homebrew on Synology depends on a
+  root-owned `/home` symlink that DSM updates delete (see Troubleshooting).
 
 ## Setup
 
@@ -58,8 +65,10 @@ git clone https://github.com/paulpengtw/synology-github-backup.git
 cd synology-github-backup
 chmod +x backup-github.sh daily-task.sh
 
-# 2. Authenticate gh once (choose HTTPS; the token needs the default 'repo' scope)
+# 2. Authenticate gh once (choose HTTPS; the token needs the default 'repo' scope),
+#    and register it as git's credential helper for private repos
 gh auth login
+gh auth setup-git
 
 # 3. First backup (defaults to ~/Backup/GitHub; override with BACKUP_DIR=...)
 ./backup-github.sh
@@ -77,8 +86,11 @@ In DSM: **Control Panel → Task Scheduler → Create → Scheduled Task → Use
   /var/services/homes/YOURNAME/synology-github-backup/daily-task.sh
   ```
 
-  Optionally enable *"Send run details by email → only when the script
-  terminates abnormally"* so you notice if a token expires.
+  **Recommended:** enable *"Send run details by email → only when the script
+  terminates abnormally"*. The scripts exit non-zero if `gh` is missing, the
+  token is invalid, the repo listing fails, or any repo fails to clone/fetch,
+  and the email includes the last 20 log lines. Without it, a broken backup
+  fails silently every night.
 
 ## Reading the log & verifying runs
 
@@ -110,7 +122,10 @@ grep -iE 'error|fatal|failed' ~/Backup/GitHub/backup.log | grep -v openhook.so
 ```
 
 A healthy run has a matching `=== Done` line for every `=== GitHub backup`
-header and nothing from the error grep. A header without a `Done` means the run
+header and nothing from the error grep. A repo that fails to clone or fetch
+gets an `ERROR: backup of <repo> did not complete` line (the rest of the run
+continues), and the run ends with `ERROR: N repo(s) did not back up this run`
+and a non-zero exit. A header without a `Done` means the run
 was interrupted; the next run picks up where it left off, since every repo is
 independently cloned-or-updated.
 
@@ -121,6 +136,14 @@ independently cloned-or-updated.
   tasks, which Homebrew binaries can't load. It is harmless and the run still
   succeeds; `daily-task.sh` unsets `LD_PRELOAD` so current versions don't log
   it at all.
+- **`ERROR: gh not found on PATH` after a DSM update** — Homebrew on Synology
+  lives under `/volume1/homes/linuxbrew`, but its binaries hardcode the loader
+  path `/home/linuxbrew/.linuxbrew/lib/ld.so`, reached through a root-owned
+  `/home -> /volume1/homes` symlink that DSM updates delete. Either install the
+  static `gh` into `~/bin` (see Prerequisites) and re-run `gh auth setup-git`
+  so git's credential helper points at it, or restore the symlink with a root
+  **Triggered Task → Boot-up** running
+  `[ -e /home ] || ln -s /volume1/homes /home`.
 - **Runs suddenly fail with authentication errors** — your GitHub token
   expired or was revoked. SSH in and run `gh auth login` again. This is why
   enabling the Task Scheduler abnormal-termination email matters.
