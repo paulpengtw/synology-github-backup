@@ -32,7 +32,7 @@ Config is env vars only: `BACKUP_DIR` (default `$HOME/Backup/GitHub`) and
 - **No root** — a normal DSM user can't create shared folders or trigger
   scheduler tasks from the CLI; defaults must live under `$HOME`.
 - **`git pull --ff-only` on purpose** — a force-pushed or diverged upstream
-  must never rewrite backup state; the fetch (`git remote update -p`) still
+  must never rewrite backup state; the fetch (`git fetch -p origin`) still
   captures all refs.
 - **Never prune** — repos deleted upstream stay on disk; that's the point of
   a backup.

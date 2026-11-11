@@ -30,11 +30,19 @@ clone_or_update() {
     echo "Updating $repo"
     (
       cd "$dest" || exit 1
-      # The fetch is the actual backup — a failure here (auth, network) must
-      # be reported, not swallowed.
-      git remote update -p >/dev/null 2>&1 || exit 1
+      # Fetching origin is the actual backup — a failure here (auth, network)
+      # must be reported, not swallowed; git's own message goes to the log.
+      git fetch -q -p origin || exit 1
+      # Other remotes are best-effort: `gh repo clone` gives forks an
+      # `upstream` remote pointing at the parent repo, which may be deleted,
+      # renamed or made private — that's not our data, so it must not fail
+      # the backup.
+      for remote in $(git remote); do
+        [ "$remote" = origin ] && continue
+        git fetch -q -p "$remote" >/dev/null 2>&1 || true
+      done
       # Advance the default branch's working copy; other branches are kept
-      # up to date as remote-tracking refs by `git remote update` above.
+      # up to date as remote-tracking refs by the fetch above.
       # A diverged/force-pushed upstream is deliberately left alone (--ff-only).
       git checkout -q main 2>/dev/null || git checkout -q master 2>/dev/null || true
       git pull -q --ff-only 2>/dev/null || true
