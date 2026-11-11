@@ -36,10 +36,13 @@ clone_or_update() {
       # Other remotes are best-effort: `gh repo clone` gives forks an
       # `upstream` remote pointing at the parent repo, which may be deleted,
       # renamed or made private — that's not our data, so it must not fail
-      # the backup.
+      # the backup. A failed fetch prints one WARNING line instead; git's own
+      # output (which contains "fatal:") stays discarded, and the WARNING text
+      # must not match the README's `grep -iE 'error|fatal|failed'` check.
       for remote in $(git remote); do
         [ "$remote" = origin ] && continue
-        git fetch -q -p "$remote" >/dev/null 2>&1 || true
+        git fetch -q -p "$remote" >/dev/null 2>&1 ||
+          echo "WARNING: $repo: could not fetch remote '$remote' (parent repo deleted or made private?)"
       done
       # Advance the default branch's working copy; other branches are kept
       # up to date as remote-tracking refs by the fetch above.

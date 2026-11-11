@@ -36,7 +36,8 @@ automatically. All branches are fetched as remote-tracking refs
 (`git fetch -p origin`); the default branch is kept checked out so you can
 browse files in File Station. Forks also get an `upstream` remote (the parent
 repo) from `gh repo clone`; it is refreshed best-effort, so a parent that was
-deleted, renamed or made private never fails the backup.
+deleted, renamed or made private never fails the backup. A failed refresh logs
+a `WARNING:` line instead.
 
 > **Not included:** issues, pull requests, wikis, and releases — this backs up
 > the git data only. Deleted repos are intentionally never pruned locally.
@@ -121,6 +122,9 @@ awk '/=== GitHub backup/{buf=""} {buf=buf $0 "\n"} END{printf "%s", buf}' \
 
 # Any real errors? (excludes DSM's harmless LD_PRELOAD warning, see below)
 grep -iE 'error|fatal|failed' ~/Backup/GitHub/backup.log | grep -v openhook.so
+
+# Non-fatal warnings (see Troubleshooting)
+grep '^WARNING' ~/Backup/GitHub/backup.log
 ```
 
 A healthy run has a matching `=== Done` line for every `=== GitHub backup`
@@ -130,6 +134,11 @@ an `ERROR: backup of <repo> did not complete` line, preceded by git's own
 with `ERROR: N repo(s) did not back up this run` and a non-zero exit. A header
 without a `Done` means the run was interrupted; the next run picks up where it
 left off, since every repo is independently cloned-or-updated.
+
+`WARNING:` lines are not failures: a fork's `upstream` remote could not be
+fetched, usually because its parent repo was deleted or made private. The fork
+itself was still backed up, the run still exits 0, and the error grep above
+does not match them, so a healthy run may contain some.
 
 ## Troubleshooting
 
@@ -153,6 +162,13 @@ left off, since every repo is independently cloned-or-updated.
   branch is named something other than `main`/`master`. All branches are still
   fetched as remote-tracking refs (nothing is lost); only the checked-out
   working copy stays behind. `cd` into it and `git checkout <branch>` once.
+- **`WARNING: <repo>: could not fetch remote 'upstream'`** — the fork's parent
+  repo was deleted or made private, so its `upstream` remote can't be fetched.
+  The fork itself is backed up as usual and the run still succeeds. To silence
+  the warning, `cd` into the fork and either point `upstream` at a parent that
+  still exists (`gh api repos/<you>/<repo> --jq .parent.clone_url` shows the one
+  GitHub reports, if any; then `git remote set-url upstream <url>`), or remove
+  the remote with `git remote remove upstream`.
 - **Testing outside the scheduler** — run `./daily-task.sh` manually over SSH;
   it behaves identically and writes to the same log.
 
