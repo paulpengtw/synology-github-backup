@@ -164,11 +164,26 @@ does not match them, so a healthy run may contain some.
   working copy stays behind. `cd` into it and `git checkout <branch>` once.
 - **`WARNING: <repo>: could not fetch remote 'upstream'`** — the fork's parent
   repo was deleted or made private, so its `upstream` remote can't be fetched.
-  The fork itself is backed up as usual and the run still succeeds. To silence
-  the warning, `cd` into the fork and either point `upstream` at a parent that
-  still exists (`gh api repos/<you>/<repo> --jq .parent.clone_url` shows the one
-  GitHub reports, if any; then `git remote set-url upstream <url>`), or remove
-  the remote with `git remote remove upstream`.
+  The fork itself is backed up as usual and the run still succeeds. The
+  `upstream/*` remote-tracking branches may be your only copy of the deleted
+  parent. The warning is harmless, and leaving the remote alone is fine. To
+  silence it, first save those branches as local `upstream-archive/*` branches,
+  then remove the remote:
+
+  ```sh
+  cd ~/Backup/GitHub/forks/<repo>
+  git for-each-ref \
+    --format='%(refname:lstrip=3) %(objectname)' refs/remotes/upstream |
+    while read -r name sha; do
+      [ "$name" = HEAD ] ||
+        git update-ref "refs/heads/upstream-archive/$name" "$sha" || exit 1
+    done &&
+  git remote remove upstream
+  ```
+
+  If any branch fails to save, the remote is left in place; fix the cause and
+  run the block again. The backup's fetch never touches local branches, so the
+  saved copies are permanent.
 - **Testing outside the scheduler** — run `./daily-task.sh` manually over SSH;
   it behaves identically and writes to the same log.
 
