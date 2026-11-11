@@ -124,12 +124,12 @@ grep -iE 'error|fatal|failed' ~/Backup/GitHub/backup.log | grep -v openhook.so
 ```
 
 A healthy run has a matching `=== Done` line for every `=== GitHub backup`
-header and nothing from the error grep. A repo that fails to clone or fetch
-gets an `ERROR: backup of <repo> did not complete` line, preceded by git's
-own `fatal:` message saying why (the rest of the run continues), and the run ends with `ERROR: N repo(s) did not back up this run`
-and a non-zero exit. A header without a `Done` means the run
-was interrupted; the next run picks up where it left off, since every repo is
-independently cloned-or-updated.
+header and nothing from the error grep. A repo that fails to clone or fetch gets
+an `ERROR: backup of <repo> did not complete` line, preceded by git's own
+`fatal:` message saying why (the rest of the run continues), and the run ends
+with `ERROR: N repo(s) did not back up this run` and a non-zero exit. A header
+without a `Done` means the run was interrupted; the next run picks up where it
+left off, since every repo is independently cloned-or-updated.
 
 ## Troubleshooting
 
